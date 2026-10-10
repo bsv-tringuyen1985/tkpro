@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import Breadcrumb from "@/components/Breadcrumb";
 import ProductGrid from "@/components/ProductGrid";
 import Pagination from "@/components/Pagination";
@@ -35,8 +36,9 @@ export default async function CategoryPage({
   let category = null;
   try {
     category = await getCategory((await params).category);
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
 
   const query = await searchParams;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
 import Breadcrumb from "@/components/Breadcrumb";
@@ -27,8 +28,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ slu
   let post;
   try {
     post = await getPost((await params).slug);
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
 
   const related = post.related ?? [];

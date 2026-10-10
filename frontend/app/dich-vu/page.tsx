@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import { getPage } from "@/services/pageService";
 import { buildMetadata } from "@/lib/metadata";
 import Breadcrumb from "@/components/Breadcrumb";
@@ -27,8 +28,9 @@ export default async function DichVuPage() {
   let page = null;
   try {
     page = await getPage("dich-vu");
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
 
   return (

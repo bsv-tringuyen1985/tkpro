@@ -8,15 +8,13 @@
  */
 
 import type { ApiEnvelope } from "@/types";
-
-const PUBLIC_API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { getPublicApiUrl } from "@/lib/runtime-config";
 
 export function getApiBase(): string {
-  if (typeof window !== "undefined") return PUBLIC_API_URL;
+  if (typeof window !== "undefined") return getPublicApiUrl();
   const internal = process.env.API_INTERNAL_URL;
   if (internal && internal.trim().length > 0) return internal;
-  return PUBLIC_API_URL;
+  return getPublicApiUrl();
 }
 
 export class ApiError extends Error {
@@ -28,6 +26,10 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
     this.errors = errors;
+    // A static page must not silently look empty when the API/CORS is unavailable.
+    if (typeof window !== "undefined" && window.TKPRO_CONFIG && (status === 0 || status >= 500 || (status >= 200 && status < 300))) {
+      window.dispatchEvent(new CustomEvent("tkpro:api-error", { detail: message }));
+    }
   }
 }
 
@@ -62,7 +64,7 @@ export async function apiFetch<T>(
   query?: Record<string, string | number | boolean | undefined>,
   options: FetchOptions = {},
 ): Promise<T> {
-  const base = options.client ? PUBLIC_API_URL : options.base ?? getApiBase();
+  const base = options.client ? getPublicApiUrl() : options.base ?? getApiBase();
   const url = buildUrl(path, query, base);
   const timeout = options.timeout ?? 15000;
   const controller = new AbortController();
@@ -72,7 +74,8 @@ export async function apiFetch<T>(
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      ...(options.revalidate !== undefined ? { next: { revalidate: options.revalidate, tags: options.tags } } : {}),
+      ...(typeof window === "undefined" && options.revalidate !== undefined
+        ? { next: { revalidate: options.revalidate, tags: options.tags } } : { cache: "no-store" as const }),
     });
 
     let json: ApiEnvelope<T> | null = null;
@@ -121,7 +124,7 @@ export async function apiFetchWithMeta<T>(
   query?: Record<string, string | number | boolean | undefined>,
   options: FetchOptions = {},
 ): Promise<{ data: T; meta?: ApiEnvelope<T>["meta"] }> {
-  const base = options.client ? PUBLIC_API_URL : options.base ?? getApiBase();
+  const base = options.client ? getPublicApiUrl() : options.base ?? getApiBase();
   const url = buildUrl(path, query, base);
   const timeout = options.timeout ?? 15000;
   const controller = new AbortController();
@@ -131,7 +134,8 @@ export async function apiFetchWithMeta<T>(
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      ...(options.revalidate !== undefined ? { next: { revalidate: options.revalidate, tags: options.tags } } : {}),
+      ...(typeof window === "undefined" && options.revalidate !== undefined
+        ? { next: { revalidate: options.revalidate, tags: options.tags } } : { cache: "no-store" as const }),
     });
     let json: ApiEnvelope<T> | null = null;
     try {
@@ -139,7 +143,7 @@ export async function apiFetchWithMeta<T>(
     } catch {
       /* ignore */
     }
-    if (!res.ok || !json || json.success === false) {
+    if (!res.ok || !json || json.success !== true) {
       const message =
         (json && json.message) ||
         (res.status === 404 ? "Không tìm thấy dữ liệu." : "Đã xảy ra lỗi. Vui lòng thử lại.");
@@ -162,7 +166,7 @@ export async function apiPost<T>(
   path: string,
   body: Record<string, unknown>,
 ): Promise<ApiEnvelope<T>> {
-  const url = buildUrl(path, undefined, PUBLIC_API_URL);
+  const url = buildUrl(path, undefined, getPublicApiUrl());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
 

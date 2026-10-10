@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import Link from "next/link";
 import Breadcrumb from "@/components/Breadcrumb";
 import ProductGallery from "@/components/ProductGallery";
@@ -34,8 +35,9 @@ export default async function ProductDetailPage({
   let product: Product;
   try {
     product = await getProduct((await params).slug);
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
 
   const settings = await getSettings();

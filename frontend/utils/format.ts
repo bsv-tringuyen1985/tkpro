@@ -1,4 +1,5 @@
 /** Tiện ích định dạng, slug, chuỗi dùng chung. */
+import { getPublicApiUrl } from "@/lib/runtime-config";
 
 /** "890.000₫" — dùng toLocaleString('vi-VN'). */
 export function formatPriceVnd(value: number): string {
@@ -45,8 +46,7 @@ export function toSlug(text: string): string {
 export function absoluteImageUrl(path?: string | null): string {
   if (!path) return "";
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  const base =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  const base = getPublicApiUrl();
   // NEXT_PUBLIC_API_URL kết thúc bằng /api/v1 -> gốc là phần trước đó
   const origin = base.replace(/\/api\/v1\/?$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;

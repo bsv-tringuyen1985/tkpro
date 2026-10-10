@@ -1,0 +1,23 @@
+DirectoryIndex index.html
+Options -Indexes -MultiViews
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Existing assets/files must never be rewritten to HTML.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Only storefront routes fall back to the app. Missing assets keep HTTP 404.
+    RewriteRule ^(?:san-pham|tin-tuc)(?:/[^/.]+){0,2}/?$ index.html [L]
+    RewriteRule ^(?:gioi-thieu|dich-vu|lien-he|tim-kiem)/?$ index.html [L]
+</IfModule>
+
+ErrorDocument 404 /index.html
+
+<IfModule mod_headers.c>
+    <FilesMatch "^(index\.html|config\.js)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>

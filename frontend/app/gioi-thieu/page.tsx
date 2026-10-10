@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import { getPage } from "@/services/pageService";
 import { buildMetadata } from "@/lib/metadata";
 import { stripHtml, truncate } from "@/utils/format";
@@ -20,8 +21,9 @@ export default async function GioiThieuPage() {
   let page = null;
   try {
     page = await getPage("gioi-thieu");
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
 
   return (

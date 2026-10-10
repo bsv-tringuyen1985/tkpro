@@ -1,5 +1,10 @@
 # TKPRO — Website giới thiệu sản phẩm điện tử / camera / linh kiện PC
 
+**Hosting không có Node.js/npm:** build frontend trên máy cá nhân bằng
+`cd frontend` rồi `npm run build:static`; upload nội dung `frontend/out/`
+vào document root. Xem [hướng dẫn cPanel/LiteSpeed](docs/CPANEL-STATIC.md).
+API/CMS vẫn chạy PHP. Các mục Next.js/Docker bên dưới dành cho bản server.
+
 Full-stack rebuild theo kiến trúc:
 
 | Thành phần | Công nghệ | Port | Vai trò |
