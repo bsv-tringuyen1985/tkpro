@@ -1,0 +1,35 @@
+{
+  "dependencies": {
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "description": "Website giới thiệu sản phẩm TKPRO — Next.js 16 + TypeScript + Tailwind",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "postcss": "^8.5.29",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.5.2",
+    "eslint": "^10.12.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@eslint/js": "^10.0.0",
+    "typescript-eslint": "^8.71.1",
+    "eslint-plugin-react-hooks": "^7.0.1"
+  },
+  "name": "tkpro-frontend",
+  "private": true,
+  "scripts": {
+    "build": "next build --webpack",
+    "dev": "next dev",
+    "lint": "eslint .",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

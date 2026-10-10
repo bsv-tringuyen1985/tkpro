@@ -1,0 +1,1409 @@
+openapi: 3.0.3
+info:
+  title: TKPRO API
+  description: |
+    REST API cho website TKPRO (thiết bị điện tử / camera / linh kiện PC).
+    Base URL dev: `http://localhost:8000/api/v1` — qua nginx: `http://localhost/api/v1`.
+
+    Envelope thành công: `{success: true, message, data, meta?}`
+    Envelope lỗi: `{success: false, message, errors?}`
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Dev (trực tiếp API)
+  - url: http://localhost/api/v1
+    description: Qua nginx
+tags:
+  - name: Auth
+    description: Đăng nhập / đăng xuất (Sanctum bearer token)
+  - name: Products
+    description: Sản phẩm (public)
+  - name: Categories
+    description: Danh mục sản phẩm (public)
+  - name: Posts
+    description: Bài viết (public)
+  - name: Pages
+    description: Trang nội dung (public)
+  - name: Banners
+    description: Banner (public)
+  - name: Menus
+    description: Menu (public)
+  - name: Settings
+    description: Cài đặt (public)
+  - name: Contact
+    description: Form liên hệ (public)
+  - name: Search
+    description: Tìm kiếm gộp
+  - name: Admin
+    description: Quản trị (auth:sanctum + permission {module}.{action})
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+      description: "Đăng nhập qua POST /auth/login để lấy token, gửi kèm header `Authorization: Bearer <token>`."
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [success, message]
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Dữ liệu không hợp lệ." }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          example:
+            phone: ["Vui lòng nhập số điện thoại."]
+
+    PaginatedMeta:
+      type: object
+      properties:
+        current_page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 12 }
+        total: { type: integer, example: 8 }
+        last_page: { type: integer, example: 1 }
+
+    SeoMeta:
+      type: object
+      properties:
+        meta_title: { type: string, nullable: true }
+        meta_description: { type: string, nullable: true }
+        meta_keywords: { type: string, nullable: true }
+        og_title: { type: string, nullable: true }
+        og_description: { type: string, nullable: true }
+        og_image: { type: string, nullable: true }
+        canonical_url: { type: string, nullable: true }
+        robots: { type: string, nullable: true }
+
+    Product:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: "Camera WiFi 2K trong nhà" }
+        slug: { type: string, example: "camera-wifi-2k-trong-nha" }
+        sku: { type: string, nullable: true, example: "CAM-WIFI-2K" }
+        short_description: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        technical_specifications:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              label: { type: string, example: "Độ phân giải" }
+              value: { type: string, example: "2K QHD" }
+        price: { type: integer, nullable: true, example: 890000, description: "VNĐ, null = Liên hệ" }
+        price_display: { type: string, example: "Giá tham khảo: 890.000₫" }
+        price_label: { type: string, nullable: true }
+        thumbnail: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        featured: { type: boolean }
+        sort_order: { type: integer }
+        category: { $ref: "#/components/schemas/ProductCategory" }
+        images:
+          type: array
+          items: { $ref: "#/components/schemas/ProductImage" }
+        seo: { $ref: "#/components/schemas/SeoMeta", nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductImage:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, example: "/storage/media/2026/10/abc123.jpg" }
+        alt: { type: string, nullable: true }
+        sort_order: { type: integer }
+
+    ProductCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, example: "Camera giám sát" }
+        slug: { type: string, example: "camera-giam-sat" }
+        description: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        sort_order: { type: integer }
+        products_count: { type: integer }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/ProductCategory" }
+
+    Post:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        excerpt: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        featured_image: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        published_at: { type: string, format: date-time, nullable: true }
+        category: { $ref: "#/components/schemas/PostCategory" }
+        author:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        seo: { $ref: "#/components/schemas/SeoMeta", nullable: true }
+        created_at: { type: string, format: date-time }
+
+    PostCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, example: "Khuyến mãi" }
+        slug: { type: string, example: "khuyen-mai" }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        posts_count: { type: integer }
+
+    Page:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        excerpt: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        featured_image: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        seo: { $ref: "#/components/schemas/SeoMeta", nullable: true }
+
+    Banner:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string, example: "Nâng cấp không gian, làm chủ công nghệ." }
+        subtitle: { type: string, nullable: true }
+        image_desktop: { type: string, nullable: true }
+        image_mobile: { type: string, nullable: true }
+        link: { type: string, nullable: true, example: "/san-pham" }
+        button_text: { type: string, nullable: true, example: "Xem sản phẩm" }
+        sort_order: { type: integer }
+        is_active: { type: boolean }
+
+    MenuItem:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        type: { type: string, enum: [url, page] }
+        url: { type: string, nullable: true, description: "URL cuối cùng (đã resolve nếu type=page)" }
+        target: { type: string, example: "_self" }
+        is_active: { type: boolean }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/MenuItem" }
+
+    Menu:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        location: { type: string, enum: [header, footer] }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/MenuItem" }
+
+    Media:
+      type: object
+      properties:
+        id: { type: integer }
+        filename: { type: string }
+        url: { type: string, example: "/storage/media/2026/10/abc123.jpg" }
+        mime_type: { type: string, example: "image/jpeg" }
+        size: { type: integer, description: "byte" }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        alt: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        must_change_password: { type: boolean }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+
+    Role:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, example: "editor" }
+        display_name: { type: string, example: "Editor" }
+        is_system: { type: boolean }
+        users_count: { type: integer }
+        permissions:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string, example: "products.view" }
+              display_name: { type: string }
+              group: { type: string }
+
+    ContactMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        subject: { type: string, nullable: true }
+        message: { type: string }
+        is_read: { type: boolean }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+  responses:
+    Unauthorized:
+      description: Chưa đăng nhập / token hết hạn
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."
+    Forbidden:
+      description: Không đủ quyền
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Bạn không có quyền thực hiện thao tác này."
+    NotFound:
+      description: Không tìm thấy
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Không tìm thấy dữ liệu."
+    ValidationError:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Dữ liệu không hợp lệ."
+            errors:
+              name: ["Vui lòng nhập tên sản phẩm."]
+    TooManyRequests:
+      description: Vượt rate limit
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Quá nhiều yêu cầu, vui lòng thử lại sau."
+
+paths:
+  # ==================== PUBLIC ====================
+  /products:
+    get:
+      tags: [Products]
+      security: []
+      summary: Danh sách sản phẩm đã xuất bản
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Tìm theo tên/SKU/mô tả" }
+        - { name: category, in: query, schema: { type: string }, description: "Slug danh mục (gồm cả danh mục con)" }
+        - { name: featured, in: query, schema: { type: boolean }, description: "featured=1: chỉ sản phẩm nổi bật" }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, price_asc, price_desc, name_asc] } }
+        - { name: per_page, in: query, schema: { type: integer, default: 12, maximum: 60 } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /products/{slug}:
+    get:
+      tags: [Products]
+      security: []
+      summary: Chi tiết sản phẩm kèm danh mục, ảnh và sản phẩm liên quan
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      product: { $ref: "#/components/schemas/Product" }
+                      related: { type: array, items: { $ref: "#/components/schemas/Product" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /categories:
+    get:
+      tags: [Categories]
+      security: []
+      summary: Cây danh mục đã xuất bản kèm đếm sản phẩm
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/ProductCategory" } }
+
+  /categories/{slug}:
+    get:
+      tags: [Categories]
+      security: []
+      summary: Chi tiết danh mục + sản phẩm thuộc danh mục (phân trang)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: per_page, in: query, schema: { type: integer, default: 12, maximum: 60 } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      category: { $ref: "#/components/schemas/ProductCategory" }
+                      products: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /posts:
+    get:
+      tags: [Posts]
+      security: []
+      summary: Danh sách bài viết đã xuất bản
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string }, description: "Slug danh mục bài viết" }
+        - { name: per_page, in: query, schema: { type: integer, default: 10, maximum: 60 } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/Post" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /posts/{slug}:
+    get:
+      tags: [Posts]
+      security: []
+      summary: Chi tiết bài viết kèm danh mục, tác giả và bài liên quan
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      post: { $ref: "#/components/schemas/Post" }
+                      related: { type: array, items: { $ref: "#/components/schemas/Post" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /post-categories:
+    get:
+      tags: [Posts]
+      security: []
+      summary: Danh sách danh mục bài viết
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/PostCategory" } }
+
+  /pages/{slug}:
+    get:
+      tags: [Pages]
+      security: []
+      summary: Chi tiết trang nội dung (gioi-thieu, dich-vu, lien-he...)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Page" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /banners:
+    get:
+      tags: [Banners]
+      security: []
+      summary: Banner đang bật, sắp xếp theo sort_order
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/Banner" } }
+
+  /menus/{location}:
+    get:
+      tags: [Menus]
+      security: []
+      summary: Menu theo vị trí (header|footer), dạng cây
+      parameters:
+        - { name: location, in: path, required: true, schema: { type: string, enum: [header, footer] } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Menu" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /settings:
+    get:
+      tags: [Settings]
+      security: []
+      summary: Cài đặt public (nhóm general, contact, social, seo)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    additionalProperties: { type: string, nullable: true }
+                    example:
+                      site_name: "TKPRO"
+                      hotline: "1900 6868"
+                      email: "support@techvision.vn"
+
+  /search:
+    get:
+      tags: [Search]
+      security: []
+      summary: Tìm kiếm gộp sản phẩm + bài viết
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2 } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      products: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                      posts: { type: array, items: { $ref: "#/components/schemas/Post" } }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /contact-messages:
+    post:
+      tags: [Contact]
+      security: []
+      summary: Gửi form liên hệ (rate limit 10/phút theo IP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, message]
+              properties:
+                name: { type: string, maxLength: 100, example: "Nguyễn Văn A" }
+                phone: { type: string, maxLength: 20, example: "0901234567" }
+                email: { type: string, format: email, example: "a@example.com" }
+                subject: { type: string, maxLength: 200 }
+                message: { type: string, maxLength: 5000 }
+      responses:
+        "201":
+          description: Đã nhận tin nhắn
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Cảm ơn bạn đã liên hệ! TKPRO sẽ phản hồi trong thời gian sớm nhất." }
+                  data: { $ref: "#/components/schemas/ContactMessage" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  # ==================== AUTH ====================
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Đăng nhập, nhận Sanctum bearer token (rate limit 5/phút)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: "admin@example.com" }
+                password: { type: string, example: "Admin123!" }
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      token: { type: string }
+                      token_type: { type: string, example: "Bearer" }
+                      must_change_password: { type: boolean }
+                      user: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất (thu hồi token hiện tại)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Đăng xuất thành công." }
+                  data: { nullable: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Thông tin user đang đăng nhập kèm vai trò/quyền
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ==================== ADMIN ====================
+  /admin/products:
+    get:
+      tags: [Admin]
+      summary: Danh sách sản phẩm (admin) — lọc q, category_id, status, featured
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - { name: featured, in: query, schema: { type: boolean } }
+        - { name: per_page, in: query, schema: { type: integer, default: 15, maximum: 100 } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo sản phẩm (permission products.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category_id, name, status]
+              properties:
+                category_id: { type: integer }
+                name: { type: string, maxLength: 255 }
+                slug: { type: string, description: "Tự sinh nếu bỏ trống" }
+                sku: { type: string }
+                short_description: { type: string, maxLength: 500 }
+                description: { type: string }
+                technical_specifications:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label: { type: string }
+                      value: { type: string }
+                price: { type: integer, description: "VNĐ, null = Liên hệ" }
+                price_label: { type: string }
+                thumbnail: { type: string, description: "URL ảnh đại diện" }
+                status: { type: string, enum: [draft, published] }
+                featured: { type: boolean }
+                sort_order: { type: integer }
+                meta_title: { type: string }
+                meta_description: { type: string }
+                meta_keywords: { type: string }
+                media_ids: { type: array, items: { type: integer }, description: "ID các file trong thư viện media để gắn làm ảnh sản phẩm" }
+                seo: { $ref: "#/components/schemas/SeoMeta" }
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/products/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết sản phẩm (permission products.view)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật sản phẩm (permission products.update)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id: { type: integer }
+                name: { type: string }
+                slug: { type: string }
+                price: { type: integer, nullable: true }
+                status: { type: string, enum: [draft, published] }
+                featured: { type: boolean }
+                media_ids: { type: array, items: { type: integer }, description: "Gửi để đồng bộ lại ảnh (bỏ trống = giữ nguyên)" }
+                seo: { $ref: "#/components/schemas/SeoMeta" }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa sản phẩm (permission products.delete)
+      responses:
+        "200":
+          description: Đã xóa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Xóa sản phẩm thành công." }
+                  data: { nullable: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/product-categories:
+    get:
+      tags: [Admin]
+      summary: Danh sách danh mục sản phẩm (lọc q, status)
+      responses:
+        "200": { description: Thành công }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo danh mục sản phẩm (permission product_categories.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, status]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                description: { type: string }
+                image: { type: string }
+                parent_id: { type: integer, nullable: true }
+                status: { type: string, enum: [draft, published] }
+                sort_order: { type: integer }
+      responses:
+        "201": { description: Đã tạo }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/product-categories/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết danh mục sản phẩm
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật danh mục sản phẩm (permission product_categories.update)
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa danh mục (chặn nếu còn sản phẩm/danh mục con) (permission product_categories.delete)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/posts:
+    get:
+      tags: [Admin]
+      summary: Danh sách bài viết (lọc q, category_id, status)
+      responses:
+        "200": { description: Thành công }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo bài viết (permission posts.create) — tự gán tác giả, tự set published_at khi xuất bản
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, status]
+              properties:
+                category_id: { type: integer, nullable: true }
+                title: { type: string }
+                slug: { type: string }
+                excerpt: { type: string }
+                content: { type: string }
+                featured_image: { type: string }
+                status: { type: string, enum: [draft, published] }
+                published_at: { type: string, format: date-time }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/posts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết bài viết
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật bài viết (permission posts.update)
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa bài viết (permission posts.delete)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/post-categories:
+    get:
+      tags: [Admin]
+      summary: Danh sách danh mục bài viết
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo danh mục bài viết (permission post_categories.create)
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/post-categories/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết danh mục bài viết
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật danh mục bài viết
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa danh mục bài viết (bài viết thuộc danh mục bị xóa sẽ mất danh mục)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/pages:
+    get:
+      tags: [Admin]
+      summary: Danh sách trang nội dung
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo trang (permission pages.create)
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/pages/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết trang
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật trang
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa trang
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/banners:
+    get:
+      tags: [Admin]
+      summary: Danh sách banner (lọc is_active)
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo banner (permission banners.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                subtitle: { type: string }
+                image_desktop: { type: string }
+                image_mobile: { type: string }
+                link: { type: string }
+                button_text: { type: string }
+                sort_order: { type: integer }
+                is_active: { type: boolean }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/banners/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết banner
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật banner
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa banner
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/menus:
+    get:
+      tags: [Admin]
+      summary: Danh sách menu (lọc location)
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo menu (permission menus.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, location]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                location: { type: string, enum: [header, footer] }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/menus/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết menu kèm cây mục menu
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật menu
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa menu (xóa luôn các mục con)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/menus/{id}/items:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer }, description: "ID menu" }
+    get:
+      tags: [Admin]
+      summary: Cây mục menu của một menu
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Admin]
+      summary: Thêm mục menu (permission menus.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, type]
+              properties:
+                title: { type: string }
+                type: { type: string, enum: [url, page] }
+                url: { type: string, description: "Bắt buộc khi type=url" }
+                page_id: { type: integer, description: "Bắt buộc khi type=page" }
+                parent_id: { type: integer, nullable: true }
+                target: { type: string, enum: [_self, _blank] }
+                sort_order: { type: integer }
+                is_active: { type: boolean }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/menu-items/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Cập nhật mục menu (permission menus.update)
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa mục menu (permission menus.delete)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/media:
+    get:
+      tags: [Admin]
+      summary: Danh sách file media (lọc q, mime=image/..., phân trang)
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: mime, in: query, schema: { type: string }, description: "VD: image/" }
+        - { name: per_page, in: query, schema: { type: integer, default: 24, maximum: 100 } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/Media" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/media/upload:
+    post:
+      tags: [Admin]
+      summary: Upload ảnh (permission media.create) — jpg/jpeg/png/webp/svg, ≤5MB, tối đa 6000px/chiều
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                alt: { type: string }
+      responses:
+        "201":
+          description: Tải lên thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Media" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/media/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Admin]
+      summary: Xóa file media (xóa cả file vật lý) (permission media.delete)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/settings:
+    get:
+      tags: [Admin]
+      summary: Tất cả cài đặt nhóm theo group (permission settings.view)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data:
+                    type: object
+                    example:
+                      general: { site_name: "TKPRO" }
+                      contact: { hotline: "1900 6868" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [Admin]
+      summary: Lưu hàng loạt cài đặt (permission settings.update)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings:
+                  type: object
+                  additionalProperties: { type: string, nullable: true }
+                  example: { site_name: "TKPRO", hotline: "1900 6868" }
+                group: { type: string, default: "general" }
+      responses:
+        "200": { description: Đã lưu }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Danh sách người dùng (lọc q)
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo người dùng (permission users.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                must_change_password: { type: boolean }
+                roles: { type: array, items: { type: integer }, description: "ID các vai trò" }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết người dùng
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật người dùng (bỏ trống password để giữ nguyên)
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa người dùng (không được xóa chính mình)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/roles:
+    get:
+      tags: [Admin]
+      summary: Danh sách vai trò kèm quyền
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin]
+      summary: Tạo vai trò (permission roles.create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, display_name]
+              properties:
+                name: { type: string, description: "alpha_dash, duy nhất" }
+                display_name: { type: string }
+                permissions: { type: array, items: { type: integer } }
+      responses:
+        "201": { description: Đã tạo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/roles/permissions:
+    get:
+      tags: [Admin]
+      summary: Tất cả quyền nhóm theo module (dùng khi gán quyền)
+      responses:
+        "200": { description: Thành công }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/roles/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: Chi tiết vai trò
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Cập nhật vai trò (không đổi mã vai trò hệ thống)
+      responses:
+        "200": { description: Thành công }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Xóa vai trò (chặn vai trò hệ thống và vai trò đang gán)
+      responses:
+        "200": { description: Đã xóa }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /admin/contact-messages:
+    get:
+      tags: [Admin]
+      summary: Danh sách tin nhắn liên hệ (lọc is_read, q)
+      parameters:
+        - { name: is_read, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: per_page, in: query, schema: { type: integer, default: 15, maximum: 100 } }
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { type: array, items: { $ref: "#/components/schemas/ContactMessage" } }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/contact-messages/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Đánh dấu đã đọc / chưa đọc (permission contact_messages.update)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_read: { type: boolean, default: true }
+      responses:
+        "200": { description: Thành công }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin]
+      summary: Xóa tin nhắn (permission contact_messages.delete)
+      responses:
+        "200": { description: Đã xóa }
+        "404": { $ref: "#/components/responses/NotFound" }

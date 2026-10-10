@@ -1,0 +1,142 @@
+# TKPRO — full stack (frontend + api + cms + mysql + nginx)
+services:
+  # ---------------------------------------------------------------------------
+  # Next.js storefront (TKPRO website)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend.Dockerfile
+      args:
+        # NEXT_PUBLIC_* nhúng vào bundle lúc build — mặc định khớp contract
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api/v1}
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost}
+    ports:
+      - "3000:3000"
+    environment:
+      # URL mà TRÌNH DUYỆT gọi tới API (khớp contract: qua nginx port 80)
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api/v1}
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost}
+      # URL mà server components (SSR) gọi tới API qua mạng nội bộ compose
+      API_INTERNAL_URL: "http://api:8000/api/v1"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Laravel API — chủ sở hữu migrations & seeds
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "TKPRO API"
+      APP_ENV: production
+      APP_KEY: ${APP_KEY:-}
+      APP_DEBUG: "false"
+      APP_URL: ${API_APP_URL:-http://localhost}
+      PUBLIC_STORAGE_URL: ${SITE_URL:-http://localhost}/storage
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: tkpro
+      DB_USERNAME: tkpro
+      DB_PASSWORD: ${DB_PASSWORD:-tkpro_secret}
+      FRONTEND_URL: ${SITE_URL:-http://localhost}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost}
+      FILESYSTEM_DISK: public
+    # Entrypoint (trong image): chờ mysql → composer install (nếu vendor thiếu)
+    # → storage:link → migrate --force → seed khi users trống → HTTP server
+    volumes:
+      - api_storage:/var/www/html/storage/app/public
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Laravel CMS (/admin) — dùng CHUNG database với api
+  # ---------------------------------------------------------------------------
+  cms:
+    build:
+      context: .
+      dockerfile: ./docker/cms.Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      APP_NAME: "TKPRO CMS"
+      APP_ENV: production
+      APP_KEY: ${APP_KEY:-}
+      APP_DEBUG: "false"
+      APP_URL: ${CMS_APP_URL:-http://localhost}
+      FRONTEND_URL: ${SITE_URL:-http://localhost}
+      PUBLIC_STORAGE_URL: ${SITE_URL:-http://localhost}/storage
+      ADMIN_PATH_PREFIX: admin
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: tkpro
+      DB_USERNAME: tkpro
+      DB_PASSWORD: ${DB_PASSWORD:-tkpro_secret}
+      SESSION_DOMAIN: ${SESSION_DOMAIN:-}
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+      FILESYSTEM_DISK: public
+    # Entrypoint (trong image): chờ mysql → composer install (nếu vendor thiếu)
+    # CMS dùng schema do API quản lý và public storage chung.
+    volumes:
+      - api_storage:/var/www/html/storage/app/public
+      - cms_storage:/legacy-media:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MySQL 8 — database CHUNG cho api + cms
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: tkpro
+      MYSQL_USER: tkpro
+      MYSQL_PASSWORD: ${DB_PASSWORD:-tkpro_secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Nginx reverse proxy — cửa ngõ duy nhất phía browser
+  #   /            → frontend:3000
+  #   /api/*       → api:8000        (giữ nguyên path /api/...)
+  #   /admin/*     → cms:8001        (cms serve với prefix /admin)
+  #   /storage/*   → api:8000/storage/*
+  # ---------------------------------------------------------------------------
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80"
+    depends_on:
+      - frontend
+      - api
+      - cms
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  api_storage:
+  cms_storage:

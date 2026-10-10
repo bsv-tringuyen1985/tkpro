@@ -1,0 +1,36 @@
+/.runtime/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+
+# Dependencies and generated files
+node_modules/
+vendor/
+.next/
+*.log
+*.tsbuildinfo
+.phpunit.cache/
+.phpunit.result.cache
+/api/bootstrap/cache/*.php
+/api/storage/framework/cache/*
+!/api/storage/framework/cache/.gitignore
+/api/storage/framework/sessions/*
+!/api/storage/framework/sessions/.gitignore
+/api/storage/framework/views/*
+!/api/storage/framework/views/.gitignore
+/api/storage/logs/*
+!/api/storage/logs/.gitignore
+/api/storage/app/public/*
+!/api/storage/app/public/.gitignore
+
+# Local archives and OS files
+/.zip
+*.sqlite
+*.sqlite3
+.DS_Store
+Thumbs.db
